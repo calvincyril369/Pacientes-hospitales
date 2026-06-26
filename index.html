@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -121,11 +122,36 @@
 
     .mini-flag span:nth-child(2) {
       background: var(--blue);
+      position: relative;
     }
 
     .mini-flag span:nth-child(3) {
       background: var(--red);
     }
+
+    .stars {
+      position: absolute;
+      inset: 0;
+      color: #fff;
+      font-size: 5.7px;
+      line-height: 1;
+    }
+
+    .stars i {
+      position: absolute;
+      font-style: normal;
+      text-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
+      transform: translate(-50%, -50%);
+    }
+
+    .stars i:nth-child(1) { left: 21%; top: 66%; }
+    .stars i:nth-child(2) { left: 29%; top: 47%; }
+    .stars i:nth-child(3) { left: 38%; top: 33%; }
+    .stars i:nth-child(4) { left: 47%; top: 27%; }
+    .stars i:nth-child(5) { left: 56%; top: 27%; }
+    .stars i:nth-child(6) { left: 65%; top: 33%; }
+    .stars i:nth-child(7) { left: 74%; top: 47%; }
+    .stars i:nth-child(8) { left: 82%; top: 66%; }
 
     .stats {
       display: grid;
@@ -586,6 +612,10 @@
       display: none !important;
     }
 
+    body.public-mode .admin-stat {
+      display: none;
+    }
+
     .source-line {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
@@ -655,28 +685,28 @@
     }
   </style>
 </head>
-<body>
+<body class="public-mode">
   <div class="flag" aria-hidden="true"><span></span><span></span><span></span></div>
   <main class="shell">
     <header>
       <div>
         <div class="brand">
-          <div class="mini-flag" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="mini-flag" aria-hidden="true"><span></span><span><b class="stars"><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i></b></span><span></span></div>
           Venezuela
         </div>
         <h1>Pacientes en hospitales</h1>
-        <p class="subtitle">Carga pacientes uno por uno o en lote, revisa posibles duplicados y publica una lista buscable por nombre, apellido, cedula, hospital, estado, municipio o direccion.</p>
+        <p class="subtitle">Consulta publica para buscar pacientes por nombre, apellido, cedula, hospital, estado, municipio o direccion. Los datos son cargados y actualizados por el equipo responsable.</p>
       </div>
       <div class="stats" aria-live="polite">
         <div class="stat"><strong id="publishedCount">0</strong><span>publicados</span></div>
-        <div class="stat"><strong id="reviewCount">0</strong><span>en revision</span></div>
-        <div class="stat"><strong id="duplicateCount">0</strong><span>posibles duplicados</span></div>
+        <div class="stat admin-stat"><strong id="reviewCount">0</strong><span>en revision</span></div>
+        <div class="stat admin-stat"><strong id="duplicateCount">0</strong><span>posibles duplicados</span></div>
       </div>
     </header>
 
     <div class="notice">
       <strong>Regla basica:</strong>
-      <span>Publica lo minimo necesario para ubicar a una persona. Evita diagnosticos, fotos de documentos, direccion de vivienda y telefonos sin autorizacion.</span>
+      <span>Esta lista es solo para ubicacion hospitalaria. No incluye diagnosticos, fotos de documentos, direccion de vivienda ni telefonos personales.</span>
     </div>
 
     <nav class="tabs" aria-label="Secciones">
@@ -1004,7 +1034,7 @@
       const params = new URLSearchParams(location.search);
       const sheetValue = params.get("sheet") || params.get("sheetUrl") || params.get("source");
       const gid = params.get("gid") || "";
-      state.isPublicMode = params.get("public") === "1" || params.get("modo") === "publico";
+      state.isPublicMode = !(params.get("admin") === "1" || params.get("modo") === "admin");
       if (!sheetValue) return null;
       return extractSheetConfig(sheetValue, gid);
     }
@@ -1123,7 +1153,7 @@
       }
       const url = new URL(location.href);
       url.pathname = url.pathname.replace(/[^/]*$/, "index.html");
-      url.search = `?sheet=${encodeURIComponent(config.sheetId)}&gid=${encodeURIComponent(config.gid || "0")}&public=1`;
+      url.search = `?sheet=${encodeURIComponent(config.sheetId)}&gid=${encodeURIComponent(config.gid || "0")}`;
       url.hash = "";
       urlBox.textContent = url.href;
     }
