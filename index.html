@@ -745,6 +745,7 @@
       </div>
       <div class="meta-row">
         <span id="resultCount">Mostrando 0 registros</span>
+        <span id="dataStatus">Conectando con Google Sheets...</span>
         <div class="button-row">
           <button class="btn ghost" id="printBtn" type="button">Imprimir</button>
             <button class="btn ghost" id="exportCsvBtn" type="button" data-admin-only>Exportar CSV</button>
@@ -908,6 +909,11 @@
     const STORAGE_KEY = "vz_pacientes_hospitales_v1";
     const REVIEW_KEY = "vz_pacientes_hospitales_review_v1";
     const SHEET_CONFIG_KEY = "vz_pacientes_sheet_config_v1";
+    const DEFAULT_SHEET_CONFIG = {
+      sheetId: "1wU-dzLulOjLUJWre27p7yCBGVZCvL9vB104Zu0cRpkI",
+      gid: "0",
+      sheetUrl: "https://docs.google.com/spreadsheets/d/1wU-dzLulOjLUJWre27p7yCBGVZCvL9vB104Zu0cRpkI/edit?gid=0#gid=0"
+    };
 
     const SAMPLE_RECORDS = [
       {
@@ -1008,6 +1014,13 @@
       toast.classList.add("show");
       clearTimeout(showToast.timer);
       showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function setSourceStatus(message) {
+      const sourceStatus = $("#sourceStatus");
+      const dataStatus = $("#dataStatus");
+      if (sourceStatus) sourceStatus.textContent = message;
+      if (dataStatus) dataStatus.textContent = message;
     }
 
     function save() {
@@ -1111,7 +1124,7 @@
 
     async function loadSheetIfConfigured() {
       const queryConfig = getQueryConfig();
-      const config = queryConfig || state.source;
+      const config = queryConfig || state.source || DEFAULT_SHEET_CONFIG;
       applyPublicMode();
       updateSheetUi(config);
       if (!config?.sheetId) {
@@ -1123,17 +1136,17 @@
       }
 
       try {
-        $("#sourceStatus").textContent = "Cargando pacientes desde Google Sheets...";
+        setSourceStatus("Cargando pacientes desde Google Sheets...");
         const table = await loadGviz(config);
         state.records = tableToRecords(table);
         state.review = [];
         state.source = config;
         if (!queryConfig) localStorage.setItem(SHEET_CONFIG_KEY, JSON.stringify(config));
-        $("#sourceStatus").textContent = `Conectado a Google Sheets. ${state.records.length} pacientes cargados.`;
+        setSourceStatus(`Conectado a Google Sheets. ${state.records.length} pacientes cargados.`);
         updateSheetUi(config);
         return true;
       } catch (error) {
-        $("#sourceStatus").textContent = `No pude leer la hoja: ${error.message}`;
+        setSourceStatus(`No pude leer la hoja: ${error.message}`);
         if (state.isPublicMode) {
           state.records = [];
           state.review = [];
@@ -1735,7 +1748,7 @@
       localStorage.removeItem(SHEET_CONFIG_KEY);
       state.source = null;
       $("#sheetUrlInput").value = "";
-      $("#sourceStatus").textContent = "Usando datos locales de este navegador.";
+      setSourceStatus("Usando datos locales de este navegador.");
       updateSheetUi(null);
       load();
       renderAll();
