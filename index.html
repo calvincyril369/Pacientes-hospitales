@@ -105,54 +105,6 @@
       font-size: 0.78rem;
     }
 
-    .mini-flag {
-      width: 52px;
-      height: 34px;
-      border: 1px solid rgba(0, 0, 0, 0.18);
-      border-radius: 4px;
-      overflow: hidden;
-      display: grid;
-      grid-template-rows: 1fr 1fr 1fr;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-    }
-
-    .mini-flag span:nth-child(1) {
-      background: var(--yellow);
-    }
-
-    .mini-flag span:nth-child(2) {
-      background: var(--blue);
-      position: relative;
-    }
-
-    .mini-flag span:nth-child(3) {
-      background: var(--red);
-    }
-
-    .stars {
-      position: absolute;
-      inset: 0;
-      color: #fff;
-      font-size: 5.7px;
-      line-height: 1;
-    }
-
-    .stars i {
-      position: absolute;
-      font-style: normal;
-      text-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
-      transform: translate(-50%, -50%);
-    }
-
-    .stars i:nth-child(1) { left: 21%; top: 66%; }
-    .stars i:nth-child(2) { left: 29%; top: 47%; }
-    .stars i:nth-child(3) { left: 38%; top: 33%; }
-    .stars i:nth-child(4) { left: 47%; top: 27%; }
-    .stars i:nth-child(5) { left: 56%; top: 27%; }
-    .stars i:nth-child(6) { left: 65%; top: 33%; }
-    .stars i:nth-child(7) { left: 74%; top: 47%; }
-    .stars i:nth-child(8) { left: 82%; top: 66%; }
-
     .stats {
       display: grid;
       grid-template-columns: repeat(3, minmax(110px, 1fr));
@@ -616,6 +568,10 @@
       display: none;
     }
 
+    body.public-mode #dataStatus {
+      display: none;
+    }
+
     .source-line {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
@@ -691,7 +647,6 @@
     <header>
       <div>
         <div class="brand">
-          <div class="mini-flag" aria-hidden="true"><span></span><span><b class="stars"><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i><i>★</i></b></span><span></span></div>
           Venezuela
         </div>
         <h1>Pacientes en hospitales</h1>
