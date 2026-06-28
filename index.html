@@ -362,6 +362,11 @@
       color: #9c1119;
     }
 
+    .tag.deceased {
+      background: var(--soft-red);
+      color: #9c1119;
+    }
+
     .location {
       display: grid;
       gap: 4px;
@@ -694,6 +699,7 @@
             <option value="por confirmar">Por confirmar</option>
             <option value="trasladado">Trasladado</option>
             <option value="alta">Alta</option>
+            <option value="fallecido">Fallecido</option>
           </select>
         </label>
         <button class="icon-btn ghost" id="clearSearch" type="button" title="Limpiar" aria-label="Limpiar">x</button>
@@ -748,6 +754,7 @@
               <option value="por confirmar">Por confirmar</option>
               <option value="trasladado">Trasladado</option>
               <option value="alta">Alta</option>
+              <option value="fallecido">Fallecido</option>
             </select>
           </label>
           <label class="wide">
@@ -864,6 +871,8 @@
     const STORAGE_KEY = "vz_pacientes_hospitales_v1";
     const REVIEW_KEY = "vz_pacientes_hospitales_review_v1";
     const SHEET_CONFIG_KEY = "vz_pacientes_sheet_config_v1";
+    const INITIAL_RENDER_LIMIT = 80;
+    const RENDER_STEP = 120;
     const DEFAULT_SHEET_CONFIG = {
       sheetId: "1wU-dzLulOjLUJWre27p7yCBGVZCvL9vB104Zu0cRpkI",
       gid: "0",
@@ -917,6 +926,8 @@
       records: [],
       review: [],
       filtered: [],
+      visibleLimit: INITIAL_RENDER_LIMIT,
+      renderTimer: null,
       activeTab: "public",
       source: null,
       isPublicMode: false
@@ -1146,11 +1157,12 @@
         createdAt: record.createdAt || nowIso(),
         updatedAt: nowIso()
       };
+      enrichRecord(normalized);
       return normalized;
     }
 
-    function searchableText(record) {
-      return normalize([
+    function enrichRecord(record) {
+      record._searchText = normalize([
         record.nombre,
         record.apellido,
         record.cedula,
@@ -1160,6 +1172,16 @@
         record.direccion,
         record.situacion
       ].join(" "));
+      record._denseText = compact(record._searchText);
+      record._searchWords = record._searchText.split(/\s+/).filter(Boolean);
+      record._hospitalKey = normalize(record.hospital);
+      record._placeKey = normalize(record.estadoMunicipio);
+      record._statusKey = normalize(record.situacion);
+      return record;
+    }
+
+    function searchableText(record) {
+      return record._searchText || enrichRecord(record)._searchText;
     }
 
     function editDistance(a, b) {
@@ -1178,19 +1200,20 @@
       return table[a.length][b.length];
     }
 
-    function tokenMatches(token, text) {
+    function tokenMatches(token, text, words) {
       if (!token) return true;
       if (text.includes(token)) return true;
       if (token.length < 4) return false;
-      return text.split(/\s+/).some((word) => word.length >= 4 && editDistance(token, word.slice(0, token.length)) <= 1);
+      return words.some((word) => word.length >= 4 && editDistance(token, word.slice(0, token.length)) <= 1);
     }
 
     function matchesSearch(record, query) {
       const tokens = splitSearch(query);
       if (!tokens.length) return true;
       const text = searchableText(record);
-      const dense = compact(text);
-      return tokens.every((token) => tokenMatches(token, text) || dense.includes(compact(token)));
+      const dense = record._denseText || compact(text);
+      const words = record._searchWords || text.split(/\s+/).filter(Boolean);
+      return tokens.every((token) => tokenMatches(token, text, words) || dense.includes(compact(token)));
     }
 
     function highlight(value, query) {
@@ -1267,7 +1290,8 @@
         ingresado: "Ingresado",
         "por confirmar": "Por confirmar",
         trasladado: "Trasladado",
-        alta: "Alta"
+        alta: "Alta",
+        fallecido: "Fallecido"
       };
       return labels[normalize(status)] || titleCase(status || "Sin situacion");
     }
@@ -1276,6 +1300,7 @@
       const clean = normalize(status);
       if (clean === "ingresado" || clean === "alta") return "ok";
       if (clean === "por confirmar") return "review";
+      if (clean === "fallecido") return "deceased";
       return "";
     }
 
@@ -1291,11 +1316,14 @@
       const hospital = $("#hospitalFilter").value;
       const place = $("#placeFilter").value;
       const status = $("#statusFilter").value;
+      const hospitalKey = normalize(hospital);
+      const placeKey = normalize(place);
+      const statusKey = normalize(status);
 
       state.filtered = state.records.filter((record) => {
-        return (!hospital || record.hospital === hospital)
-          && (!place || record.estadoMunicipio === place)
-          && (!status || normalize(record.situacion) === normalize(status))
+        return (!hospitalKey || record._hospitalKey === hospitalKey)
+          && (!placeKey || record._placeKey === placeKey)
+          && (!statusKey || record._statusKey === statusKey)
           && matchesSearch(record, query);
       });
 
@@ -1306,7 +1334,9 @@
         return;
       }
 
-      $("#results").innerHTML = state.filtered.map((record, index) => `
+      const visibleRecords = state.filtered.slice(0, state.visibleLimit);
+      const remainingCount = Math.max(0, state.filtered.length - visibleRecords.length);
+      $("#results").innerHTML = visibleRecords.map((record, index) => `
         <article class="card patient-card">
           <div>
             <h2 class="patient-title">${highlight(`${record.nombre} ${record.apellido}`.trim() || "Sin nombre", query)}</h2>
@@ -1327,7 +1357,18 @@
             <button class="btn danger" type="button" data-delete="${record.id}" data-admin-only>Borrar</button>
           </div>
         </article>
-      `).join("");
+      `).join("") + (remainingCount ? `
+        <div class="empty">
+          <button class="btn primary" type="button" id="showMoreBtn">Mostrar ${Math.min(RENDER_STEP, remainingCount)} mas</button>
+          <div style="margin-top:8px">Quedan ${remainingCount} resultados sin mostrar.</div>
+        </div>
+      ` : "");
+    }
+
+    function schedulePublicRender(resetLimit = false) {
+      if (resetLimit) state.visibleLimit = INITIAL_RENDER_LIMIT;
+      clearTimeout(state.renderTimer);
+      state.renderTimer = setTimeout(renderPublicList, 120);
     }
 
     function renderReview() {
@@ -1389,6 +1430,7 @@
     }
 
     function renderAll() {
+      state.records.forEach(enrichRecord);
       updateStats();
       buildFilters();
       renderPublicList();
@@ -1578,14 +1620,15 @@
 
     $$(".tab").forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
     ["searchInput", "hospitalFilter", "placeFilter", "statusFilter"].forEach((id) => {
-      $(`#${id}`).addEventListener("input", renderPublicList);
-      $(`#${id}`).addEventListener("change", renderPublicList);
+      $(`#${id}`).addEventListener("input", () => schedulePublicRender(true));
+      $(`#${id}`).addEventListener("change", () => schedulePublicRender(true));
     });
     $("#clearSearch").addEventListener("click", () => {
       $("#searchInput").value = "";
       $("#hospitalFilter").value = "";
       $("#placeFilter").value = "";
       $("#statusFilter").value = "";
+      state.visibleLimit = INITIAL_RENDER_LIMIT;
       renderPublicList();
       $("#searchInput").focus();
     });
@@ -1635,9 +1678,15 @@
     });
     $("#clearBatchBtn").addEventListener("click", () => { $("#batchText").value = ""; });
     $("#results").addEventListener("click", (event) => {
+      const showMore = event.target.closest("#showMoreBtn");
       const detail = event.target.closest("[data-detail]");
       const edit = event.target.closest("[data-edit]");
       const remove = event.target.closest("[data-delete]");
+      if (showMore) {
+        state.visibleLimit += RENDER_STEP;
+        renderPublicList();
+        return;
+      }
       if (detail) openDetail(Number(detail.dataset.detail));
       if (edit) editRecord(edit.dataset.edit);
       if (remove) deleteRecord(remove.dataset.delete);
